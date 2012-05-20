@@ -1,0 +1,194 @@
+<apex:page controller="VoodooController" showHeader="false" standardStylesheets="false">
+    <head>
+        <script type="text/javascript" language="javascript" src="{!URLFOR($Resource.knockout,'knockout-2.0.0.js')}" />
+        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+        
+        <link href="{!URLFOR($Resource.styles)}" rel="stylesheet" type="text/css" />
+    </head>
+    <body>
+
+        <div id="voodoo">
+    
+            <div id="todo-container">
+                <form data-bind="submit: addTask" id="create-todo">
+                    <input class="new-todo" data-bind="value: newTaskText" placeholder="What needs to be done?" />
+                </form>
+        
+                <div class="todos">
+                    <ul data-bind="foreach: tasks, visible: tasks().length > 0" id="todo-list">
+                        <li>
+                            <div class="todo" data-bind="css: { editing: isEditing }, event: { dblclick: startEdit }">
+                                <div class="display" data-bind="css: { done: isDone }">
+                                    <input type="checkbox" class="check" data-bind="checked: isDone" />
+                                    <div class="todo-text" data-bind="text: title"></div>
+                                    <a href="#" class="todo-destroy" data-bind="click: $parent.removeTask">&times;</a>
+                                </div>
+                                <div class="edit">
+                                    <form data-bind="submit: endEdit">
+                                        <input data-bind="value: title" />
+                                    </form>
+                                </div>
+                            </div>
+                        </li> 
+                    </ul>
+                </div>
+        
+                <div id="stats">
+                    You have <b data-bind="text: incompleteTasks().length">&nbsp;</b> incomplete task(s)
+                    <span data-bind="visible: incompleteTasks().length == 0"> - its beer time!</span>
+                    <a data-bind="visible: completeTasks().length > 0, click: removeCompleted " href="#" id="clear-completed">Clear Completed Tasks</a>
+        
+                    <div id="credits">
+                        <p>Dbl-click to edit tasks.</p>
+                    </div>                  
+                </div>
+            </div>
+        </div>
+        
+        <script>
+        
+            /* data goes here */
+            taskData = '';
+            
+            /* Voodoo Remoting */
+            VoodooController.getTodosAsJson(function(result, event){
+                
+                var todos = jQuery.parseJSON(result);
+                var formattedTodos = new Array();
+                
+                for( i=0; i < todos.length; i++ ){
+                    var t = new Object();
+                    t.id = todos[i].Id;
+                    t.title = todos[i].Title__c;
+                    t.isDone = todos[i].isDone__c;
+                    
+                    formattedTodos.push(t);
+                }
+                
+                taskData = eval(JSON.stringify(formattedTodos));
+                
+                /* Knockout */
+                        
+                function Task(data) {
+                    var self = this;
+                    
+                    /* Task data */
+                    this.id = data.id;
+                    this.title = ko.observable(data.title);
+                    this.isDone = ko.observable(data.isDone);
+                    this.isEditing = ko.observable(data.isEditing);
+                    
+                    this.isDone.subscribe(function(newValue) {
+                        self.save();
+                    });
+                    
+                    /* Task methods */
+                    this.startEdit = function (event) {
+                        this.isEditing(true);
+                    }
+                    
+                    this.endEdit = function () {
+                        this.isEditing(false);
+                        self.save();
+                    }
+                    
+                    this.save = function () {
+                        var task = this;
+                        
+                        var todo = salesforceifyTodo(task);
+                        
+                        VoodooController.updateTodo(todo, function(result, event){
+
+                        }, {escape: false});                        
+                    }
+                }
+        
+                function TaskListViewModel() {
+                    // Data
+                    var self = this;
+                    self.tasks = ko.observableArray([]);
+                    self.newTaskText = ko.observable();
+                    self.incompleteTasks = ko.computed(function() {
+                        return ko.utils.arrayFilter(self.tasks(), 
+                            function(task) { 
+                                return !task.isDone() && !task._destroy;
+                            });
+                    });
+                
+                    self.completeTasks = ko.computed(function(){
+                        return ko.utils.arrayFilter(self.tasks(), 
+                            function(task) { 
+                                return task.isDone() && !task._destroy;
+                            });
+                    });
+                
+                    // Operations
+                    self.addTask = function() {
+                        VoodooController.createTodo(this.newTaskText(), function(result, event){
+                            
+                            self.tasks.push(new Task({ id: result, title: self.newTaskText(), isEditing: false }));
+                            self.newTaskText("");                               
+                                                        
+                        }, {escape: false});                    
+                    };
+                    
+                    self.removeTask = function(task) {
+                        VoodooController.deleteTodo(salesforceifyTodo(task), function(result, event){
+                            self.tasks.destroy(task);
+                        }, {escape: false}); 
+                    };
+                
+                    self.removeCompleted = function(){
+                        VoodooController.deleteTodos(salesforceifyTodos(self.completeTasks()), function(result, event){
+                            self.tasks.destroyAll(self.completeTasks());            
+                        }, {escape: false});                    
+                    };
+                
+                    /* Load the data */           
+                    var mappedTasks = $.map(taskData, function(item){
+                        return new Task(item);
+                    });
+                
+                    self.tasks(mappedTasks);            
+                }
+        
+                ko.applyBindings(new TaskListViewModel());              
+                
+            }, {escape: false});  
+            
+            /* Utility Methods */
+            function salesforceifyTodo(t){
+                var sTodo = t;
+                console.log(sTodo);
+                
+                var todo = new Todo__c();
+                todo.Id = sTodo.id;
+                todo.Title__c = sTodo.title();
+                todo.isDone__c = sTodo.isDone();
+                
+                return todo;                    
+            }
+            
+            function salesforceifyTodos(todos){
+                console.log(todos);
+                var sTodos = new Array();
+            
+                for(var i = 0; i < todos.length; i++){
+                    var sTodo = salesforceifyTodo(todos[i]);
+                    
+                    sTodos.push(sTodo);
+                }
+                
+                return sTodos;
+            }   
+            
+			/* Remoting objects proxy for convenience*/
+            function Todo__c() {
+                this.Id = null;
+                this.Title__c = null;
+                this.isDone__c = null;
+            }          
+    
+        </script>   
+    </body> 
+</apex:page>

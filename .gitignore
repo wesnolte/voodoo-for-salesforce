@@ -1,0 +1,10 @@
+# don't need these
+
+.settings/
+
+# OS generated files
+
+.DS_Store*
+ehthumbs.db
+Icon?
+Thumbs.db
