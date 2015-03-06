@@ -3,7 +3,7 @@
 
 ##Overview
 
-Follow me [@wesnolte](http://twitter.com/wesnolte)
+Follow me [@wesnolte](http://twitter.com/wesnolte).
 
 Voodoo is a todo list application that demonstrates the power of JavaScript MV* frameworks (specifically KnockoutJS) and Force.com through the use of JavaScript Remoting.
 
