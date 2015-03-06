@@ -9,9 +9,9 @@ Voodoo is a todo list application that demonstrates the power of JavaScript MV* 
 
 Features include:
 
-* Looks just like Salesforce
-* Lightning fast
-* Most simple todo features supported
+* Looks just like Salesforce.
+* Lightning fast.
+* Most simple todo features supported.
 
 ![Voodoo for Salesforce](http://i.imgur.com/rEbi8.png "Todo it now!")
 
